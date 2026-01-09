@@ -2,7 +2,9 @@ import { promises as fs } from "fs";
 import path from "path";
 import { NextResponse } from "next/server";
 
-const DATA_DIR = path.join(process.cwd(), "data");
+const DATA_DIR = process.env.VERCEL
+  ? path.join("/tmp", "waitlist-data")
+  : path.join(process.cwd(), "data");
 const WAITLIST_PATH = path.join(DATA_DIR, "waitlist.jsonl");
 
 const ALLOWED_ORIGINS = (process.env.FRONTEND_ORIGINS || "")
