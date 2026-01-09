@@ -2,14 +2,9 @@ import { promises as fs } from "fs";
 import path from "path";
 import { NextResponse } from "next/server";
 
-const isVercel =
-  process.env.VERCEL ||
-  process.env.VERCEL_ENV ||
-  process.env.VERCEL_URL;
-const DATA_DIR = isVercel
-  ? path.join("/tmp", "waitlist-data")
-  : path.join(process.cwd(), "data");
-const WAITLIST_PATH = path.join(DATA_DIR, "waitlist.jsonl");
+const PRIMARY_DATA_DIR = path.join(process.cwd(), "data");
+const FALLBACK_DATA_DIR = path.join("/tmp", "waitlist-data");
+const WAITLIST_FILENAME = "waitlist.jsonl";
 
 const ALLOWED_ORIGINS = (process.env.FRONTEND_ORIGINS || "")
   .split(",")
@@ -69,6 +64,16 @@ async function sendNotification(email: string) {
   }
 }
 
+async function getWritableDataDir() {
+  try {
+    await fs.mkdir(PRIMARY_DATA_DIR, { recursive: true });
+    return PRIMARY_DATA_DIR;
+  } catch (error) {
+    await fs.mkdir(FALLBACK_DATA_DIR, { recursive: true });
+    return FALLBACK_DATA_DIR;
+  }
+}
+
 export async function OPTIONS(request: Request) {
   const origin = request.headers.get("origin");
   const headers = corsHeaders(origin);
@@ -97,12 +102,13 @@ export async function POST(request: Request) {
     );
   }
 
-  await fs.mkdir(DATA_DIR, { recursive: true });
+  const dataDir = await getWritableDataDir();
+  const waitlistPath = path.join(dataDir, WAITLIST_FILENAME);
   const record = {
     email,
     createdAt: new Date().toISOString()
   };
-  await fs.appendFile(WAITLIST_PATH, `${JSON.stringify(record)}\n`, "utf8");
+  await fs.appendFile(waitlistPath, `${JSON.stringify(record)}\n`, "utf8");
 
   try {
     await sendNotification(email);
